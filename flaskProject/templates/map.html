@@ -1,0 +1,312 @@
+{% extends "base.html" %} {% block title %}Home{% endblock %} {% block content
+%}
+
+<h1 align="center">Map</h1>
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        background-color: #f5f5f5;
+        text-align: center;
+    }
+
+    h1 {
+        font-size: 32px;
+        color: #333;
+    }
+
+    form {
+        margin: 20px auto;
+        padding: 20px;
+        background-color: #fff;
+        border-radius: 5px;
+        box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.2);
+        max-width: 1600px; /* Adjust the width here */
+        margin: 0 auto;
+    }
+
+    label {
+        display: block;
+        font-size: 16px;
+        margin-bottom: 10px;
+        color: #333;
+    }
+
+    input[type="text"],
+    input[type="email"],
+    input[type="file"] {
+        width: 100%;
+        padding: 10px;
+        margin-bottom: 20px;
+        border: 1px solid #ccc;
+        border-radius: 3px;
+    }
+
+    .dropdown {
+        margin-bottom: 20px;
+    }
+
+    button {
+        background-color: #333;
+        color: #fff;
+        border: none;
+        padding: 10px 20px;
+        font-size: 18px;
+        border-radius: 3px;
+        cursor: pointer;
+    }
+
+    button:hover {
+        background-color: #555;
+    }
+
+    p.message {
+        font-size: 18px;
+        color: #333;
+        margin-top: 20px;
+    }
+</style>
+
+<head>
+<meta charset="utf-8">
+<title>Locate the user</title>
+
+<meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+<link href="https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.css" rel="stylesheet">
+<script src="https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.js"></script>
+<style>
+body { margin: 0; padding: 0; }
+</style>
+</head>
+<body>
+<form method="POST" enctype="multipart/form-data">
+
+    <div class="container mt-4">
+      <div class="row">
+        <div class="col-md-3">
+          <select class="form-select mb-3" id="driver" name="driver">
+                <option value="None">Choose Driver...</option>
+
+                {% for driver in driver_list %}
+                    <option value="{{ driver.pid }}">
+                        {{ driver.pid }} - {{ driver.forename }} {{ driver.surname }} - {{ driver.nick }} - {{ driver.email }}
+                    </option>
+                {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-3">
+          <select class="form-select mb-3" id="vehicle" name="vehicle">
+                <option value="None">Choose Vehicle...</option>
+
+                {% for vehicle in vehicle_list %}
+                    <option value="{{ vehicle.fzid }}">
+                        {{ vehicle.fzid }} - {{ vehicle.vin }} - {{ vehicle.polkz }}
+                    </option>
+                {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-2">
+          <input type="date" id="datepicker_start" class="form-control" placeholder="Select a date" name="datepicker_start" >
+
+        </div>
+        <div class="col-md-2">
+          <input type="date" id="datepicker_end" class="form-control" placeholder="Select a date" name="datepicker_end" >
+
+        </div>
+        <div class="col-md-1">
+        <button  class="btn btn-dark">Submit</button>
+        </div>
+      </div>
+    </div>
+</form>
+
+
+<div id="map" style="width: 100%; height: 600px;"></div>
+
+
+<script>
+	mapboxgl.accessToken = 'pk.eyJ1IjoibWFya3RiczEiLCJhIjoiY2xtajFjMnBmMDAxZTJxb3ZtaDBmdnp3NSJ9.ixCF69SMR67sSqfhh_I-xg';
+    const map = new mapboxgl.Map({
+    container: 'map', // container ID
+    // Choose from Mapbox's core styles, or make your own style with Mapbox Studio
+    style: 'mapbox://styles/mapbox/navigation-night-v1', // style URL
+        // 'mapbox://styles/mapbox/standard-beta'
+        // 'mapbox://styles/marktbs1/clo4abuqp00n101r20m6z3w35'
+    center: [7.2162, 51.4818], // starting center in [lng, lat]
+    zoom: 1.5 // starting zoom
+    });
+    map.addControl(new mapboxgl.NavigationControl());
+
+    // Add geolocate control to the map.
+    map.addControl(
+    new mapboxgl.GeolocateControl({
+    positionOptions: {
+    enableHighAccuracy: true
+    },
+    // When active the map will receive updates to the device's location as it changes.
+    trackUserLocation: true,
+    // Draw an arrow next to the location dot to indicate which direction the device is heading.
+    showUserHeading: true
+    })
+    );
+//
+    //    map.on('style.load', () => {
+    //    map.addSource('mapbox-dem', {
+    //        'type': 'raster-dem',
+    //        'url': 'mapbox://mapbox.mapbox-terrain-dem-v1',
+    //        'tileSize': 512,
+    //        'maxzoom': 14
+    //    });
+    //    // add the DEM source as a terrain layer with exaggerated height
+    //    map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.5 });
+    //});
+
+
+
+    map.on('load', () => {
+        map.addSource('route', {
+            'type': 'geojson',
+            'data': {
+                'type': 'FeatureCollection',
+                'features': [
+                    {% for list in waypoints_by_tid_for_mapbox %}
+
+                    {
+                        'type': 'Feature',
+                        'geometry': {
+                            'type': 'LineString',
+                            'coordinates': [
+                            {% for koordinaten in waypoints_by_tid_for_mapbox[list] %}
+                                {{ koordinaten }}{% if not loop.last %},{% endif %}
+                            {% endfor %}
+                            ]
+                        }
+                    },
+                    {% endfor %}
+                ]
+            }
+
+        });
+        map.addLayer({
+            'id': 'route',
+            'type': 'line',
+            'source': 'route',
+            'layout': {
+                'line-join': 'round',
+                'line-cap': 'round'
+            },
+            'paint': {
+                'line-color': '#12aede',
+                'line-width': 8,
+            }
+        });
+    });
+
+
+var coordinates = {{ first_last_coordinates }};
+
+        // Create a GeoJSON source from the coordinates
+        var geojson = {
+            type: 'FeatureCollection',
+            features: coordinates.map(function (coord) {
+                return {
+                    type: 'Feature',
+                    geometry: {
+                        type: 'Point',
+                        coordinates: coord
+                    }
+                };
+            })
+        };
+
+        // Add a layer to the map to display the coordinates
+        map.on('load', function () {
+            map.addSource('coordinates', {
+                type: 'geojson',
+                data: geojson
+            });
+
+            map.addLayer({
+                id: 'coordinates',
+                type: 'circle',
+                source: 'coordinates',
+                paint: {
+                    'circle-radius': 6,
+                    'circle-color': '#FF0000'
+                }
+            });
+        });
+
+   //         // Set custom fog
+   // map.setFog({
+   //     'range': [-0.5, 2],
+   //     'color': '#def',
+   //     'high-color': '#def',
+   //     'space-color': '#def'
+   // });
+   // // Add terrain source, with slight exaggeration
+   // map.addSource('mapbox-dem', {
+   //     'type': 'raster-dem',
+   //     'url': 'mapbox://mapbox.terrain-rgb',
+   //     'tileSize': 512,
+   //     'maxzoom': 14
+   // });
+   // map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.5 });
+map.on('style.load', () => {
+        // Insert the layer beneath any symbol layer.
+        const layers = map.getStyle().layers;
+        const labelLayerId = layers.find(
+            (layer) => layer.type === 'symbol' && layer.layout['text-field']
+        ).id;
+
+        // The 'building' layer in the Mapbox Streets
+        // vector tileset contains building height data
+        // from OpenStreetMap.
+        map.addLayer(
+            {
+                'id': 'add-3d-buildings',
+                'source': 'composite',
+                'source-layer': 'building',
+                'filter': ['==', 'extrude', 'true'],
+                'type': 'fill-extrusion',
+                'minzoom': 15,
+                'paint': {
+                    'fill-extrusion-color': '#aaa',
+
+                    // Use an 'interpolate' expression to
+                    // add a smooth transition effect to
+                    // the buildings as the user zooms in.
+                    'fill-extrusion-height': [
+                        'interpolate',
+                        ['linear'],
+                        ['zoom'],
+                        15,
+                        0,
+                        15.05,
+                        ['get', 'height']
+                    ],
+                    'fill-extrusion-base': [
+                        'interpolate',
+                        ['linear'],
+                        ['zoom'],
+                        15,
+                        0,
+                        15.05,
+                        ['get', 'min_height']
+                    ],
+                    'fill-extrusion-opacity': 0.6
+                }
+            },
+            labelLayerId
+        );
+    });
+</script>
+
+</body>
+</html>
+</script>
+    {% if message %}
+        <p class="message">{{ message }}</p>
+    {% endif %}
+</body>
+
+{% endblock %}
